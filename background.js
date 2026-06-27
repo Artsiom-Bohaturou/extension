@@ -1,25 +1,30 @@
 const overlayState = new Map();
+let lastCapture = null;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'CAPTURE_TAB') {
     captureTab(message.tabId)
-      .then((dataUrl) => sendResponse({ ok: true, dataUrl }))
+      .then((capture) => sendResponse({ ok: true, capture }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
   if (message?.type === 'APPLY_OVERLAY') {
-    applyOverlay(message.targetTabId, message.dataUrl, message.opacity)
-      .then(() => sendResponse({ ok: true }))
+    applyOverlay(message.targetTabId, message.opacity)
+      .then((overlay) => sendResponse({ ok: true, overlay }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
   if (message?.type === 'CLEAR_OVERLAY') {
     clearOverlay(message.targetTabId)
-      .then(() => sendResponse({ ok: true }))
+      .then(() => sendResponse({ ok: true, status: getStatus() }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
+  }
+
+  if (message?.type === 'GET_STATUS') {
+    sendResponse({ ok: true, status: getStatus() });
   }
 });
 
@@ -28,14 +33,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     return;
   }
 
-  const { dataUrl, opacity } = overlayState.get(tabId);
-  applyOverlay(tabId, dataUrl, opacity).catch(() => {
+  const overlay = overlayState.get(tabId);
+  injectOverlayIntoTab(tabId, overlay.dataUrl, overlay.opacity).catch(() => {
     overlayState.delete(tabId);
   });
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   overlayState.delete(tabId);
+  if (lastCapture?.sourceTabId === tabId) {
+    lastCapture = null;
+  }
 });
 
 async function captureTab(tabId) {
@@ -49,7 +57,15 @@ async function captureTab(tabId) {
   await waitForTabComplete(tabId);
   await delay(250);
 
-  return chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+  lastCapture = {
+    dataUrl,
+    sourceTabId: tabId,
+    sourceTitle: tab.title || 'Untitled tab',
+    capturedAt: Date.now()
+  };
+
+  return captureForPopup(lastCapture);
 }
 
 async function waitForTabComplete(tabId) {
@@ -69,13 +85,33 @@ async function waitForTabComplete(tabId) {
   });
 }
 
-async function applyOverlay(targetTabId, dataUrl, opacity = 0.5) {
+async function applyOverlay(targetTabId, opacity = 0.5) {
+  if (!lastCapture?.dataUrl) {
+    throw new Error('Capture a source tab before applying an overlay.');
+  }
+
+  const targetTab = await chrome.tabs.get(targetTabId);
+  const overlay = {
+    dataUrl: lastCapture.dataUrl,
+    opacity,
+    sourceTabId: lastCapture.sourceTabId,
+    sourceTitle: lastCapture.sourceTitle,
+    targetTabId,
+    targetTitle: targetTab.title || 'Untitled tab',
+    appliedAt: Date.now()
+  };
+
+  await injectOverlayIntoTab(targetTabId, overlay.dataUrl, overlay.opacity);
+  overlayState.set(targetTabId, overlay);
+  return overlayForPopup(overlay);
+}
+
+async function injectOverlayIntoTab(targetTabId, dataUrl, opacity) {
   await chrome.scripting.executeScript({
     target: { tabId: targetTabId },
     func: injectOverlay,
     args: [dataUrl, opacity]
   });
-  overlayState.set(targetTabId, { dataUrl, opacity });
 }
 
 async function clearOverlay(targetTabId) {
@@ -84,6 +120,32 @@ async function clearOverlay(targetTabId) {
     func: removeOverlay
   });
   overlayState.delete(targetTabId);
+}
+
+function getStatus() {
+  return {
+    capture: lastCapture ? captureForPopup(lastCapture) : null,
+    overlays: [...overlayState.values()].map(overlayForPopup)
+  };
+}
+
+function captureForPopup(capture) {
+  return {
+    sourceTabId: capture.sourceTabId,
+    sourceTitle: capture.sourceTitle,
+    capturedAt: capture.capturedAt
+  };
+}
+
+function overlayForPopup(overlay) {
+  return {
+    opacity: overlay.opacity,
+    sourceTabId: overlay.sourceTabId,
+    sourceTitle: overlay.sourceTitle,
+    targetTabId: overlay.targetTabId,
+    targetTitle: overlay.targetTitle,
+    appliedAt: overlay.appliedAt
+  };
 }
 
 function injectOverlay(dataUrl, opacity) {

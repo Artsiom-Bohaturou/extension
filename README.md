@@ -7,7 +7,11 @@ A Chrome Manifest V3 extension for comparing two open tabs. Pick a source tab, c
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Choose **Load unpacked** and select this repository folder.
-4. Open the extension popup, choose a source tab, click **Capture source**, choose a target tab, then click **Overlay on target**.
+4. Open two normal web pages in the same Chrome window.
+5. Open the extension popup, choose a source tab, and click **Capture source**.
+6. If Chrome switches to the source tab and closes the popup, reopen the popup.
+7. Choose a target tab and click **Overlay on target**.
+8. The popup shows a **Working** badge while an overlay is active. Click **Dismiss overlay** to remove it from the target tab.
 
 ## Notes
 

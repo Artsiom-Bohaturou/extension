@@ -8,17 +8,29 @@
   </head>
   <body>
     <main>
-      <h1>Tab Overlay</h1>
-      <p class="hint">Pick a source tab, capture it, then overlay it at 50% opacity on a target tab.</p>
+      <header class="header">
+        <div>
+          <h1>Tab Overlay</h1>
+          <p class="hint">Capture one tab, then place it over another at 50% opacity.</p>
+        </div>
+        <span id="workBadge" class="badge idle">Idle</span>
+      </header>
 
-      <label for="sourceTab">Source tab</label>
-      <select id="sourceTab"></select>
-      <button id="captureButton">Capture source</button>
+      <section id="activePanel" class="panel hidden" aria-live="polite">
+        <strong>Overlay running</strong>
+        <p id="activeDetails"></p>
+        <button id="dismissButton" class="danger">Dismiss overlay</button>
+      </section>
 
-      <label for="targetTab">Target tab</label>
-      <select id="targetTab"></select>
-      <button id="overlayButton" disabled>Overlay on target</button>
-      <button id="clearButton">Clear target overlay</button>
+      <section class="panel">
+        <label for="sourceTab">Source tab</label>
+        <select id="sourceTab"></select>
+        <button id="captureButton">Capture source</button>
+
+        <label for="targetTab">Target tab</label>
+        <select id="targetTab"></select>
+        <button id="overlayButton" disabled>Overlay on target</button>
+      </section>
 
       <p id="status" role="status"></p>
     </main>
