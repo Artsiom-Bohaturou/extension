@@ -29,6 +29,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
+
+  if (message?.type === 'GET_OVERLAY_IMAGE') {
+    getOverlayImage(message.targetTabId)
+      .then((dataUrl) => sendResponse({ ok: true, dataUrl }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -116,11 +123,11 @@ async function applyOverlay(targetTabId, opacity = 0.5, sourceTabId = null) {
   return overlayForPopup(overlay);
 }
 
-async function injectOverlayIntoTab(targetTabId, dataUrl, opacity) {
+async function injectOverlayIntoTab(targetTabId, _dataUrl, opacity) {
   await chrome.scripting.executeScript({
     target: { tabId: targetTabId },
     func: injectOverlay,
-    args: [dataUrl, opacity]
+    args: [targetTabId, opacity]
   });
 }
 
@@ -152,6 +159,20 @@ async function saveLastCapture() {
   await chrome.storage.session.set({ lastCapture });
 }
 
+async function getOverlayImage(targetTabId) {
+  const overlay = overlayState.get(targetTabId);
+  if (overlay?.dataUrl) {
+    return overlay.dataUrl;
+  }
+
+  await loadLastCapture();
+  if (lastCapture?.dataUrl) {
+    return lastCapture.dataUrl;
+  }
+
+  throw new Error('Overlay image is no longer available. Capture the source tab again.');
+}
+
 function captureForPopup(capture) {
   return {
     sourceTabId: capture.sourceTabId,
@@ -171,7 +192,7 @@ function overlayForPopup(overlay) {
   };
 }
 
-function injectOverlay(dataUrl, opacity) {
+async function injectOverlay(targetTabId, opacity) {
   const existingOverlay = document.getElementById('tab-overlay-composer-root');
   existingOverlay?.remove();
 
@@ -184,7 +205,12 @@ function injectOverlay(dataUrl, opacity) {
   overlay.style.overflow = 'hidden';
 
   const image = document.createElement('img');
-  image.src = dataUrl;
+  const response = await chrome.runtime.sendMessage({ type: 'GET_OVERLAY_IMAGE', targetTabId });
+  if (!response?.ok) {
+    throw new Error(response?.error || 'Overlay image is unavailable.');
+  }
+
+  image.src = response.dataUrl;
   image.alt = 'Overlay from selected source tab';
   image.style.width = '100vw';
   image.style.height = '100vh';

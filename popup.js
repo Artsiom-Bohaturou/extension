@@ -27,7 +27,7 @@ captureButton.addEventListener('click', async () => {
 
   hasCapture = true;
   overlayButton.disabled = false;
-  setStatus('Source captured. Reopen the popup if Chrome switched tabs, then choose a target.');
+  setStatus('Source captured and remembered. Choose a target tab and click Overlay on target.');
 });
 
 overlayButton.addEventListener('click', async () => {
@@ -84,6 +84,12 @@ async function init() {
   const status = statusResponse.ok ? statusResponse.status : null;
   hasCapture = Boolean(status?.capture);
   activeOverlay = status?.overlays?.[0] || null;
+  if (status?.capture?.sourceTabId) {
+    sourceSelect.value = String(status.capture.sourceTabId);
+  }
+  if (activeOverlay?.targetTabId) {
+    targetSelect.value = String(activeOverlay.targetTabId);
+  }
   overlayButton.disabled = !options.length;
   renderWorkingState();
 
