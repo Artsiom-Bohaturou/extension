@@ -10,7 +10,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === 'APPLY_OVERLAY') {
-    applyOverlay(message.targetTabId, message.opacity)
+    applyOverlay(message.targetTabId, message.opacity, message.sourceTabId)
       .then((overlay) => sendResponse({ ok: true, overlay }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -24,7 +24,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === 'GET_STATUS') {
-    sendResponse({ ok: true, status: getStatus() });
+    loadLastCapture()
+      .then(() => sendResponse({ ok: true, status: getStatus() }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
   }
 });
 
@@ -43,6 +46,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   overlayState.delete(tabId);
   if (lastCapture?.sourceTabId === tabId) {
     lastCapture = null;
+    chrome.storage.session.remove('lastCapture');
   }
 });
 
@@ -64,6 +68,7 @@ async function captureTab(tabId) {
     sourceTitle: tab.title || 'Untitled tab',
     capturedAt: Date.now()
   };
+  await saveLastCapture();
 
   return captureForPopup(lastCapture);
 }
@@ -85,9 +90,13 @@ async function waitForTabComplete(tabId) {
   });
 }
 
-async function applyOverlay(targetTabId, opacity = 0.5) {
-  if (!lastCapture?.dataUrl) {
-    throw new Error('Capture a source tab before applying an overlay.');
+async function applyOverlay(targetTabId, opacity = 0.5, sourceTabId = null) {
+  await loadLastCapture();
+  if (!lastCapture?.dataUrl || (sourceTabId && lastCapture.sourceTabId !== sourceTabId)) {
+    if (!sourceTabId) {
+      throw new Error('Choose a source tab before applying an overlay.');
+    }
+    await captureTab(sourceTabId);
   }
 
   const targetTab = await chrome.tabs.get(targetTabId);
@@ -101,6 +110,7 @@ async function applyOverlay(targetTabId, opacity = 0.5) {
     appliedAt: Date.now()
   };
 
+  await chrome.tabs.update(targetTabId, { active: true });
   await injectOverlayIntoTab(targetTabId, overlay.dataUrl, overlay.opacity);
   overlayState.set(targetTabId, overlay);
   return overlayForPopup(overlay);
@@ -127,6 +137,19 @@ function getStatus() {
     capture: lastCapture ? captureForPopup(lastCapture) : null,
     overlays: [...overlayState.values()].map(overlayForPopup)
   };
+}
+
+async function loadLastCapture() {
+  if (lastCapture?.dataUrl) {
+    return;
+  }
+
+  const stored = await chrome.storage.session.get('lastCapture');
+  lastCapture = stored.lastCapture || null;
+}
+
+async function saveLastCapture() {
+  await chrome.storage.session.set({ lastCapture });
 }
 
 function captureForPopup(capture) {

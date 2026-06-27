@@ -3,7 +3,7 @@
   "name": "Tab Overlay Composer",
   "description": "Select one open tab, then overlay a half-opacity snapshot of it on top of another tab.",
   "version": "0.1.0",
-  "permissions": ["tabs", "activeTab", "scripting"],
+  "permissions": ["tabs", "activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",

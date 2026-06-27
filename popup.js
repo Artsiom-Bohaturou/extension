@@ -32,10 +32,11 @@ captureButton.addEventListener('click', async () => {
 
 overlayButton.addEventListener('click', async () => {
   const targetTabId = Number(targetSelect.value);
-  setBusy(true, 'Applying overlay to target tab...');
+  setBusy(true, hasCapture ? 'Applying overlay to target tab...' : 'Capturing source and applying overlay...');
 
   const response = await sendMessage({
     type: 'APPLY_OVERLAY',
+    sourceTabId: Number(sourceSelect.value),
     targetTabId,
     opacity: 0.5
   });
@@ -83,7 +84,7 @@ async function init() {
   const status = statusResponse.ok ? statusResponse.status : null;
   hasCapture = Boolean(status?.capture);
   activeOverlay = status?.overlays?.[0] || null;
-  overlayButton.disabled = !hasCapture;
+  overlayButton.disabled = !options.length;
   renderWorkingState();
 
   if (!options.length) {
@@ -99,7 +100,7 @@ async function init() {
   } else if (hasCapture) {
     setStatus('Source is captured. Choose a target tab and apply the overlay.');
   } else {
-    setStatus('Select a source tab to capture.');
+    setStatus('Select source and target tabs, then click Overlay on target. Capture source is optional.');
   }
 }
 
@@ -150,7 +151,7 @@ function sendMessage(message) {
 
 function setBusy(isBusy, message = '') {
   captureButton.disabled = isBusy;
-  overlayButton.disabled = isBusy || !hasCapture;
+  overlayButton.disabled = isBusy;
   dismissButton.disabled = isBusy || !activeOverlay;
   if (message) {
     setStatus(message);
