@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tab Overlay Composer</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header class="header">
+        <div>
+          <h1>Tab Overlay</h1>
+          <p class="hint">Capture one tab, then place it over another at 50% opacity.</p>
+        </div>
+        <span id="workBadge" class="badge idle">Idle</span>
+      </header>
+
+      <section id="activePanel" class="panel hidden" aria-live="polite">
+        <strong>Overlay running</strong>
+        <p id="activeDetails"></p>
+        <button id="dismissButton" class="danger">Dismiss overlay</button>
+      </section>
+
+      <section class="panel">
+        <label for="sourceTab">Source tab</label>
+        <select id="sourceTab"></select>
+        <button id="captureButton">Capture source</button>
+
+        <label for="targetTab">Target tab</label>
+        <select id="targetTab"></select>
+        <button id="overlayButton">Overlay on target</button>
+      </section>
+
+      <p id="status" role="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
